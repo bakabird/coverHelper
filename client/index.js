@@ -5,7 +5,7 @@ const startTime = (new Date).getTime()
 var loop = setInterval(()=>{
     if(times-- >= 0){
         const client = net.createConnection({
-            port: 25003
+            port: 25005
         },()=>{
             console.log('connect suc')
         })

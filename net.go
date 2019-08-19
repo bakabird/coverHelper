@@ -15,7 +15,7 @@ import (
 )
 
 func startListen(db *sql.DB) {
-	ln, err := net.Listen("tcp", "127.0.0.1:25003")
+	ln, err := net.Listen("tcp", "127.0.0.1:25005")
 	fmt.Println("开始监听")
 	defer ln.Close()
 
