@@ -42,7 +42,7 @@ func startListen(db *sql.DB) {
 
 func handleConnection(conn net.Conn, db *sql.DB) {
 	defer masterBack()
-	defer conn.Close()
+	// defer conn.Close()
 
 	fmt.Println(">>> 开始处理连接")
 	const originHub = "./origin"
@@ -68,8 +68,10 @@ func handleConnection(conn net.Conn, db *sql.DB) {
 		for {
 			n, err := conn.Read(revBuf)
 			rcvStr := string(revBuf[:n])
+			fmt.Println(`暂时接受到字符串：`, rcvStr)
 			if err != nil {
 				fmt.Println(`[STEP2]在接受连接输入时出现错误：`, err)
+				// BIRDTODO: 如果执行出错应该返回一个错误给连接端
 				return
 			} else {
 				coverUrlStrings += rcvStr[:n]

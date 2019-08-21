@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -11,21 +12,21 @@ var cond_workerBack = sync.NewCond(new(sync.Mutex))
 
 func callWorker() {
 	mu_workers.Lock()
-	// var callerNo = w_callNo
+	var callerNo = w_callNo
 	w_callNo++
-	// fmt.Println(fmt.Sprintf("【%d】呼唤工人", callerNo))
+	fmt.Println(fmt.Sprintf("【%d】呼唤工人", callerNo))
 	if workers <= 0 {
 		// 等待工人回来消息
 		cond_workerBack.L.Lock()
 		mu_workers.Unlock()
-		// fmt.Println(fmt.Sprintf("【%d】等待中", callerNo))
+		fmt.Println(fmt.Sprintf("【%d】等待中", callerNo))
 		cond_workerBack.Wait()
 		cond_workerBack.L.Unlock()
-		// fmt.Println(fmt.Sprintf("【%d】重新叫号", callerNo))
+		fmt.Println(fmt.Sprintf("【%d】重新叫号", callerNo))
 		callWorker()
 	} else {
 		workers--
-		// fmt.Println(">>>>>>>>> 给", callerNo, "派出了一个工人：现在有工人:", workers)
+		fmt.Println(">>>>>>>>> 给", callerNo, "派出了一个工人：现在有工人:", workers)
 		mu_workers.Unlock()
 	}
 }
