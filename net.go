@@ -50,6 +50,7 @@ func handleConnection(conn net.Conn, db *sql.DB) {
 
 	var tasks = 0
 	var cond_tasks = sync.NewCond(new(sync.Mutex))
+	var mu_conn sync.Mutex
 
 	// step.1 接受命令，并了解将发送的字符长度
 	revBuf := make([]byte, 1024)
@@ -80,7 +81,7 @@ func handleConnection(conn net.Conn, db *sql.DB) {
 					tasks = len(coverUrls)
 					for _, coverUrl := range coverUrls {
 						callWorker()
-						go dealSave(db, coverUrl, cond_tasks, &tasks)
+						go dealSave(db, coverUrl, cond_tasks, &tasks, &mu_conn, conn)
 					}
 					break
 				} else {
@@ -96,9 +97,14 @@ func handleConnection(conn net.Conn, db *sql.DB) {
 	conn_back_ok(conn)
 }
 
-func dealSave(db *sql.DB, coverUrl string, cond_tasks *sync.Cond, tasks *int) {
+func dealSave(db *sql.DB, coverUrl string, cond_tasks *sync.Cond, tasks *int, mu_conn *sync.Mutex, conn net.Conn) {
 	defer workerBack()
 	defer taskFinish(tasks, cond_tasks)
+	defer (func() {
+		(*mu_conn).Lock()
+		conn.Write([]byte("W"))
+		(*mu_conn).Unlock()
+	})()
 	mu_db.Lock()
 	isExist := db_IsExist(db, coverUrl)
 	mu_db.Unlock()
