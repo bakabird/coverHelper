@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"image"
+	"image/png"
 	"io"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -42,9 +44,16 @@ func resizeImg(sourcePath string, aimW, aimH int) (image.Image, error) {
 	file, _ := os.Open(sourcePath)
 	defer file.Close()
 
-	img, _, err := image.Decode(file)
+	ext := filepath.Ext(sourcePath)
+	var img image.Image
+	var err error
+	if ext == ".png" {
+		img, err = png.Decode(file)
+	} else {
+		img, _, err = image.Decode(file)
+	}
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println("Decode时出错", err.Error())
 		return nil, err
 	}
 

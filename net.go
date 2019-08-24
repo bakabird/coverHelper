@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"image/jpeg"
+	"image/png"
 	"net"
 	"net/url"
 	"os"
@@ -147,27 +148,33 @@ func dealSave(db *sql.DB, coverUrl string, cond_tasks *sync.Cond, tasks *int, mu
 			}
 			fmt.Println("下载成功：", coverPath)
 
-			img, err := resizeImg(coverPath, 640, 400)
+			img, err := resizeImg(coverPath, 320, 200)
 			if err != nil {
 				fmt.Println(`调整图片大小时遇到错误：`, coverPath, err)
 				return
 			}
 			fmt.Println("调整大小成功")
 
-			jpgPath := path.Join(coverFileHub, base)
-			jpgout, err := os.Create(jpgPath)
-			defer jpgout.Close()
+			newFilePath := path.Join(coverFileHub, base)
+			newFileExt := filepath.Ext(newFilePath)
+			newFile, err := os.Create(newFilePath)
+			defer newFile.Close()
 			if err != nil {
-				fmt.Println(`新建文件时遇到错误：`, jpgPath, err)
+				fmt.Println(`新建文件时遇到错误：`, newFilePath, err)
 				return
 			}
 
-			_ = jpeg.Encode(jpgout, img, nil)
-			fmt.Println("保存 jpg 成功", jpgPath)
+			if newFileExt == ".png" {
+				_ = png.Encode(newFile, img)
+				fmt.Println("保存PNG文件成功", newFilePath)
+			} else {
+				_ = jpeg.Encode(newFile, img, nil)
+				fmt.Println("保存文件成功", newFilePath)
+			}
 
 			// 在数据库中保存 coverUrl-path 对
 			mu_db.Lock()
-			db_SavePair(db, coverUrl, jpgPath)
+			db_SavePair(db, coverUrl, newFilePath)
 			mu_db.Unlock()
 
 			DAM_LOCK()
