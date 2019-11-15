@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"image"
 	"image/jpeg"
 	"image/png"
 	"net"
@@ -132,21 +133,8 @@ func dealSave(db *sql.DB, coverUrl string, cond_tasks *sync.Cond, tasks *int, mu
 		} else {
 			DAM_doing(coverUrl)
 			DAM_UNLOCK()
-			urlParseRes, err := url.Parse(coverUrl)
-			if err != nil {
-				fmt.Println(`解析url时遇到问题：`, coverUrl, err)
-				return
-			}
 
-			base := filepath.Base(urlParseRes.Path)
-			coverPath := filepath.Join(coverFileTempHub, base)
-
-			err = Download(coverUrl, coverPath)
-			if err != nil {
-				fmt.Println(`下载时遇到错误：`, coverUrl, err)
-				return
-			}
-			fmt.Println("下载成功：", coverPath)
+			coverPath := downloadPic(coverUrl)
 
 			img, err := resizeImg(coverPath, 320, 200)
 			if err != nil {
@@ -155,22 +143,7 @@ func dealSave(db *sql.DB, coverUrl string, cond_tasks *sync.Cond, tasks *int, mu
 			}
 			fmt.Println("调整大小成功")
 
-			newFilePath := path.Join(coverFileHub, base)
-			newFileExt := filepath.Ext(newFilePath)
-			newFile, err := os.Create(newFilePath)
-			defer newFile.Close()
-			if err != nil {
-				fmt.Println(`新建文件时遇到错误：`, newFilePath, err)
-				return
-			}
-
-			if newFileExt == ".png" {
-				_ = png.Encode(newFile, img)
-				fmt.Println("保存PNG文件成功", newFilePath)
-			} else {
-				_ = jpeg.Encode(newFile, img, nil)
-				fmt.Println("保存文件成功", newFilePath)
-			}
+			newFilePath := saveLocalCover(coverUrl, img)
 
 			// 在数据库中保存 coverUrl-path 对
 			mu_db.Lock()
@@ -182,5 +155,72 @@ func dealSave(db *sql.DB, coverUrl string, cond_tasks *sync.Cond, tasks *int, mu
 			DAM_UNLOCK()
 			DAM_getCond(coverUrl).Broadcast()
 		}
+	}
+}
+
+func downloadPic(coverUrl string) string {
+	urlParseRes, err := url.Parse(coverUrl)
+	if err != nil {
+		fmt.Println(`解析url时遇到问题：`, coverUrl, err)
+		panic(err)
+	}
+
+	makeTempSubHostDir(urlParseRes.Host)
+
+	base := filepath.Base(urlParseRes.Path)
+	coverPath := filepath.Join(coverFileTempHub, "./"+urlParseRes.Host+"/", base)
+	err = Download(coverUrl, coverPath)
+	if err != nil {
+		fmt.Println(`下载时遇到错误：`, coverUrl, err)
+		panic(err)
+	}
+	fmt.Println("下载成功：", coverPath)
+	return coverPath
+}
+
+func saveLocalCover(coverUrl string, img image.Image) string {
+	urlParseRes, err := url.Parse(coverUrl)
+	if err != nil {
+		fmt.Println(`解析url时遇到问题：`, coverUrl, err)
+		panic(err)
+	}
+
+	makeSubHostDir(urlParseRes.Host)
+
+	base := filepath.Base(urlParseRes.Path)
+	newFilePath := filepath.Join(coverFileHub, "./"+urlParseRes.Host+"/", base)
+	newFileExt := filepath.Ext(newFilePath)
+
+	newFile, err := os.Create(newFilePath)
+	defer newFile.Close()
+	if err != nil {
+		fmt.Println(`新建文件时遇到错误：`, newFilePath, err)
+		panic(err)
+	}
+
+	if newFileExt == ".png" {
+		_ = png.Encode(newFile, img)
+		fmt.Println("保存PNG文件成功", newFilePath)
+	} else {
+		_ = jpeg.Encode(newFile, img, nil)
+		fmt.Println("保存文件成功", newFilePath)
+	}
+
+	return newFilePath
+}
+
+func makeSubHostDir(hostname string) {
+	err := os.MkdirAll(path.Join(coverFileHub, "./"+hostname+"/"), os.ModePerm)
+	if err != nil {
+		fmt.Println(`域名子文件夹创建失败`)
+		panic(err)
+	}
+}
+
+func makeTempSubHostDir(hostname string) {
+	err := os.MkdirAll(path.Join(coverFileTempHub, "./"+hostname+"/"), os.ModePerm)
+	if err != nil {
+		fmt.Println(`域名子文件夹创建失败`)
+		panic(err)
 	}
 }
