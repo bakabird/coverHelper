@@ -19,11 +19,14 @@ var serverTimes = 0
 var mu_db sync.Mutex
 
 var DOINIT = flag.Bool("i", false, "重新初始化数据库和图片仓库")
+var SHOW_VERSION = flag.Bool("v", false, "打印目前的版本号")
 
 // BIRDTODO: 避免同时下载同一个文件。 <-- 用一个MAP来记录工人准备去下载的
 func main() {
 	flag.Parse()
-	if *DOINIT {
+	if *SHOW_VERSION {
+		fmt.Println("version: 0.1.02")
+	} else if *DOINIT {
 		doInit()
 	} else {
 		// BIRDTODO: 在init程序中确保图片仓库存在
