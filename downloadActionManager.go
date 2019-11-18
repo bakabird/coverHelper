@@ -21,7 +21,9 @@ func DAM_UNLOCK() {
 }
 
 func DAM_complete(name string) {
+	DAM_LOCK()
 	downloadTasks[name] = actionStatus_complete
+	DAM_UNLOCK()
 }
 func DAM_doing(name string) {
 	if !DAM_isExist(name) {
@@ -40,6 +42,12 @@ func DAM_isDoing(name string) bool {
 func DAM_isExist(name string) bool {
 	_, exist := downloadTasks[name]
 	return exist
+}
+
+func DAM_condWait(name string) {
+	DAM_getCond(name).L.Lock()
+	DAM_getCond(name).Wait()
+	DAM_getCond(name).L.Unlock()
 }
 
 func DAM_getCond(name string) *sync.Cond {

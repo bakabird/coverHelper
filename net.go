@@ -50,6 +50,7 @@ func handleConnection(conn net.Conn, db *sql.DB) {
 	const originHub = "./origin"
 	const jpgHub = "./jpg"
 
+	var taskRlt []string
 	var tasks = 0
 	var cond_tasks = sync.NewCond(new(sync.Mutex))
 	var mu_conn sync.Mutex
@@ -81,9 +82,10 @@ func handleConnection(conn net.Conn, db *sql.DB) {
 				if len(coverUrlStrings) >= urlsStrLen {
 					coverUrls := strings.Split(coverUrlStrings, " ")
 					tasks = len(coverUrls)
-					for _, coverUrl := range coverUrls {
+					taskRlt = make([]string, tasks)
+					for index, coverUrl := range coverUrls {
 						callWorker()
-						go dealSave(db, coverUrl, cond_tasks, &tasks, &mu_conn, conn)
+						go dealSave(db, index, coverUrl, taskRlt, cond_tasks, &tasks, &mu_conn, conn)
 					}
 					break
 				} else {
@@ -96,10 +98,11 @@ func handleConnection(conn net.Conn, db *sql.DB) {
 	}
 
 	waitTasksFinish(&tasks, cond_tasks)
+	fmt.Println(taskRlt)
 	conn_back_ok(conn)
 }
 
-func dealSave(db *sql.DB, coverUrl string, cond_tasks *sync.Cond, tasks *int, mu_conn *sync.Mutex, conn net.Conn) {
+func dealSave(db *sql.DB, index int, coverUrl string, taskRlt []string, cond_tasks *sync.Cond, tasks *int, mu_conn *sync.Mutex, conn net.Conn) {
 	defer workerBack()
 	defer taskFinish(tasks, cond_tasks)
 	defer (func() {
@@ -107,54 +110,35 @@ func dealSave(db *sql.DB, coverUrl string, cond_tasks *sync.Cond, tasks *int, mu
 		conn.Write([]byte("W"))
 		(*mu_conn).Unlock()
 	})()
-	mu_db.Lock()
-	isExist := db_IsExist(db, coverUrl)
-	mu_db.Unlock()
-	if isExist {
-		fmt.Println(`该URL的图片已经保存好了`, coverUrl)
-	} else {
-		fmt.Println(`遇到没保存过图片的URL`, coverUrl)
-		DAM_LOCK()
-		if DAM_isExist(coverUrl) {
-			if DAM_isDoing(coverUrl) {
-				DAM_UNLOCK()
-				fmt.Println(`任务由其它的工人完成，等待...`)
-				DAM_getCond(coverUrl).L.Lock()
-				DAM_getCond(coverUrl).Wait()
-				DAM_getCond(coverUrl).L.Unlock()
-				fmt.Println(`任务由其它的工人完成了！可喜可贺可喜可贺`)
-			} else if DAM_isComplete(coverUrl) {
-				DAM_UNLOCK()
-				fmt.Println(`任务已经由其它的工人完成过了`)
-			} else {
-				DAM_UNLOCK()
-				fmt.Println(`DAM 执行出错了 遇到了奇怪的 actionStats`)
-			}
+
+	isBilibCover := isBilibCover(coverUrl)
+	if isBilibCover {
+		isExist := db_muIsExist(db, coverUrl)
+		if isExist {
+			whenIsExist(db, index, coverUrl, taskRlt)
 		} else {
-			DAM_doing(coverUrl)
-			DAM_UNLOCK()
-
-			coverPath := downloadPic(coverUrl)
-
-			img, err := resizeImg(coverPath, 320, 200)
-			if err != nil {
-				fmt.Println(`调整图片大小时遇到错误：`, coverPath, err)
-				return
-			}
-			fmt.Println("调整大小成功")
-
-			newFilePath := saveLocalCover(coverUrl, img)
-
-			// 在数据库中保存 coverUrl-path 对
-			mu_db.Lock()
-			db_SavePair(db, coverUrl, newFilePath)
-			mu_db.Unlock()
-
+			fmt.Println(`遇到没保存过图片的URL`, coverUrl)
 			DAM_LOCK()
-			DAM_complete(coverUrl)
-			DAM_UNLOCK()
-			DAM_getCond(coverUrl).Broadcast()
+			if DAM_isExist(coverUrl) {
+				if DAM_isDoing(coverUrl) {
+					DAM_UNLOCK()
+					whenOtherWorking(db, index, coverUrl, taskRlt)
+				} else if DAM_isComplete(coverUrl) {
+					DAM_UNLOCK()
+					whenJobDone(db, index, coverUrl, taskRlt)
+				} else {
+					DAM_UNLOCK()
+					whenError(index, taskRlt)
+				}
+			} else {
+				DAM_doing(coverUrl)
+				DAM_UNLOCK()
+				whenWorking(db, index, coverUrl, taskRlt)
+			}
 		}
+	} else {
+		fmt.Println(`该封面URL不需要被转译`)
+		taskRlt[index] = coverUrl
 	}
 }
 
@@ -223,4 +207,56 @@ func makeTempSubHostDir(hostname string) {
 		fmt.Println(`域名子文件夹创建失败`)
 		panic(err)
 	}
+}
+
+func isBilibCover(coverUrl string) bool {
+	urlRes, _ := url.Parse(coverUrl)
+	return strings.Index(urlRes.Host, "hdslb.com") > -1
+}
+
+func whenIsExist(db *sql.DB, index int, coverUrl string, taskRlt []string) {
+	fmt.Println(`该URL的图片已经保存好了`, coverUrl)
+	path := db_muGet(db, coverUrl)
+	taskRlt[index] = path
+}
+
+func whenOtherWorking(db *sql.DB, index int, coverUrl string, taskRlt []string) {
+	fmt.Println(`任务由其它的工人完成，等待...`)
+	DAM_condWait(coverUrl)
+
+	path := db_muGet(db, coverUrl)
+	taskRlt[index] = path
+	fmt.Println(`任务由其它的工人完成了！可喜可贺可喜可贺`)
+}
+
+func whenJobDone(db *sql.DB, index int, coverUrl string, taskRlt []string) {
+	path := db_muGet(db, coverUrl)
+	taskRlt[index] = path
+	fmt.Println(`任务已经由其它的工人完成过了`)
+}
+
+func whenError(index int, taskRlt []string) {
+	taskRlt[index] = ""
+	fmt.Println(`DAM 执行出错了 遇到了奇怪的 actionStats`)
+}
+
+func whenWorking(db *sql.DB, index int, coverUrl string, taskRlt []string) {
+	coverPath := downloadPic(coverUrl)
+
+	img, err := resizeImg(coverPath, 320, 200)
+	if err != nil {
+		fmt.Println(`调整图片大小时遇到错误：`, coverPath, err)
+		return
+	}
+	fmt.Println("调整大小成功")
+
+	newFilePath := saveLocalCover(coverUrl, img)
+
+	// 在数据库中保存 coverUrl-path 对
+	db_muSavePair(db, coverUrl, newFilePath)
+
+	DAM_complete(coverUrl)
+	DAM_getCond(coverUrl).Broadcast()
+	// 添加对 taskRlt
+	taskRlt[index] = newFilePath
 }
