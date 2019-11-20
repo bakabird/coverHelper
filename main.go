@@ -39,6 +39,7 @@ func main() {
 			fmt.Println("在启动前请确保数据库存在")
 			return
 		}
+		fmt.Println("huburl", *STATIC_COVER_HUB)
 		startListen(db)
 	}
 }
