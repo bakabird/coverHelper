@@ -30,6 +30,8 @@ func main() {
 	} else if *DOINIT {
 		doInit()
 	} else {
+		fmt.Println("huburl", *STATIC_COVER_HUB)
+
 		// BIRDTODO: 在init程序中确保图片仓库存在
 		db, err := sql.Open("sqlite3", dbPath)
 		fmt.Println("开启数据库连接")
@@ -39,7 +41,6 @@ func main() {
 			fmt.Println("在启动前请确保数据库存在")
 			return
 		}
-		fmt.Println("huburl", *STATIC_COVER_HUB)
 		startListen(db)
 	}
 }
