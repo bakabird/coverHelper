@@ -277,16 +277,27 @@ func dealReturn(conn net.Conn, taskRlt string) {
 	if err != nil {
 		fmt.Println(`在等待连接返回 R 时出现错误：`, err)
 	} else if rcvStr[0] == 'R' {
-		// -> taskRlt
-		fmt.Println(`返回数据：`, taskRlt)
-		conn.Write([]byte(taskRlt))
+		// -> R{length of taskRlt}
+		fmt.Println(`返回数据的长度`, len(taskRlt))
+		conn.Write([]byte(string(len(taskRlt))))
 
-		// <- O(OVER)
 		revBuf = make([]byte, 1024)
 		n, err = conn.Read(revBuf)
 		rcvStr = string(revBuf[:n])
-		if rcvStr[0] != 'O' {
-			fmt.Println(`没能正常收到连接返回的 O`, rcvStr)
+		if err != nil {
+			fmt.Println(`在等待连接返回 C(continue) 时出现错误：`, err)
+		} else if rcvStr[0] == 'C' {
+			// -> taskRlt
+			fmt.Println(`返回数据：`, taskRlt)
+			conn.Write([]byte(taskRlt))
+
+			// <- O(OVER)
+			revBuf = make([]byte, 1024)
+			n, err = conn.Read(revBuf)
+			rcvStr = string(revBuf[:n])
+			if rcvStr[0] != 'O' {
+				fmt.Println(`没能正常收到连接返回的 O`, rcvStr)
+			}
 		}
 	} else {
 		fmt.Println(`在准备返回数据过程中出错了，发送OK之后收到信息：`, rcvStr)
