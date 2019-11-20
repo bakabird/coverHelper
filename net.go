@@ -98,8 +98,7 @@ func handleConnection(conn net.Conn, db *sql.DB) {
 	}
 
 	waitTasksFinish(&tasks, cond_tasks)
-	fmt.Println(taskRlt)
-	conn_back_ok(conn)
+	dealReturn(conn, strings.Join(taskRlt, " "))
 }
 
 func dealSave(db *sql.DB, index int, coverUrl string, taskRlt []string, cond_tasks *sync.Cond, tasks *int, mu_conn *sync.Mutex, conn net.Conn) {
@@ -217,7 +216,7 @@ func isBilibCover(coverUrl string) bool {
 func whenIsExist(db *sql.DB, index int, coverUrl string, taskRlt []string) {
 	fmt.Println(`该URL的图片已经保存好了`, coverUrl)
 	path := db_muGet(db, coverUrl)
-	taskRlt[index] = path
+	taskAddPath(taskRlt, index, path)
 }
 
 func whenOtherWorking(db *sql.DB, index int, coverUrl string, taskRlt []string) {
@@ -225,13 +224,13 @@ func whenOtherWorking(db *sql.DB, index int, coverUrl string, taskRlt []string) 
 	DAM_condWait(coverUrl)
 
 	path := db_muGet(db, coverUrl)
-	taskRlt[index] = path
+	taskAddPath(taskRlt, index, path)
 	fmt.Println(`任务由其它的工人完成了！可喜可贺可喜可贺`)
 }
 
 func whenJobDone(db *sql.DB, index int, coverUrl string, taskRlt []string) {
 	path := db_muGet(db, coverUrl)
-	taskRlt[index] = path
+	taskAddPath(taskRlt, index, path)
 	fmt.Println(`任务已经由其它的工人完成过了`)
 }
 
@@ -258,5 +257,38 @@ func whenWorking(db *sql.DB, index int, coverUrl string, taskRlt []string) {
 	DAM_complete(coverUrl)
 	DAM_getCond(coverUrl).Broadcast()
 	// 添加对 taskRlt
-	taskRlt[index] = newFilePath
+	taskAddPath(taskRlt, index, newFilePath)
+}
+
+func taskAddPath(taskRlt []string, index int, coverPath string) {
+	taskRlt[index] = path.Join(*STATIC_COVER_HUB, coverPath)
+}
+
+func dealReturn(conn net.Conn, taskRlt string) {
+	fmt.Println(`>>> 开始准备返回数据`)
+
+	// -> OK
+	conn_back_ok(conn)
+
+	// <- R(Rlt)
+	revBuf := make([]byte, 1024)
+	n, err := conn.Read(revBuf)
+	rcvStr := string(revBuf[:n])
+	if err != nil {
+		fmt.Println(`在等待连接返回 R 时出现错误：`, err)
+	} else if rcvStr[0] == 'R' {
+		// -> taskRlt
+		fmt.Println(`返回数据：`, taskRlt)
+		conn.Write([]byte(taskRlt))
+
+		// <- O(OVER)
+		revBuf = make([]byte, 1024)
+		n, err = conn.Read(revBuf)
+		rcvStr = string(revBuf[:n])
+		if rcvStr[0] != 'O' {
+			fmt.Println(`没能正常收到连接返回的 O`, rcvStr)
+		}
+	} else {
+		fmt.Println(`在准备返回数据过程中出错了，发送OK之后收到信息：`, rcvStr)
+	}
 }

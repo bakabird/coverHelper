@@ -20,12 +20,13 @@ var mu_db sync.Mutex
 
 var DOINIT = flag.Bool("i", false, "重新初始化数据库和图片仓库")
 var SHOW_VERSION = flag.Bool("v", false, "打印目前的版本号")
+var STATIC_COVER_HUB = flag.String("huburl", "http://127.0.0.1:8360/static/", "图片仓库对应的静态路径，带URL")
 
 // BIRDTODO: 避免同时下载同一个文件。 <-- 用一个MAP来记录工人准备去下载的
 func main() {
 	flag.Parse()
 	if *SHOW_VERSION {
-		fmt.Println("version: 0.1.02")
+		fmt.Println("version: 0.1.1")
 	} else if *DOINIT {
 		doInit()
 	} else {
