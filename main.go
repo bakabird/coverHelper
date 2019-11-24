@@ -26,7 +26,7 @@ var STATIC_COVER_HUB = flag.String("huburl", "http://127.0.0.1:8360/static/", "å
 func main() {
 	flag.Parse()
 	if *SHOW_VERSION {
-		fmt.Println("version: 0.1.2")
+		fmt.Println("version: 0.1.22")
 	} else if *DOINIT {
 		doInit()
 	} else {

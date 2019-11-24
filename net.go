@@ -278,8 +278,8 @@ func dealReturn(conn net.Conn, taskRlt string) {
 		fmt.Println(`在等待连接返回 R 时出现错误：`, err)
 	} else if rcvStr[0] == 'R' {
 		// -> R{length of taskRlt}
-		fmt.Println(`返回数据的长度`, len(taskRlt))
-		conn.Write([]byte(string(len(taskRlt))))
+		fmt.Println(`返回数据的长度L(len)`, len(taskRlt))
+		conn.Write([]byte("L" + strconv.Itoa(len(taskRlt))))
 
 		revBuf = make([]byte, 1024)
 		n, err = conn.Read(revBuf)
