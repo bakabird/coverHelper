@@ -9,7 +9,7 @@ var loop = setInterval(()=>{
         },()=>{
             console.log('connect suc')
         })
-        urlsStr = `http://i0.hdslb.com/bfs/archive/aa5ff915c3de108f4ca978e3e48b9aa3908ba40d.png`
+        urlsStr = `http://i2.hdslb.com/bfs/archive/6ba5f7e15b9322e2b3653538bfcc614f657816e8.jpg`
         client.write(`C${urlsStr.length}`)
         client.on('data',(data)=>{
             console.log('recv data:',String(data) )

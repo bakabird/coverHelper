@@ -261,7 +261,7 @@ func whenWorking(db *sql.DB, index int, coverUrl string, taskRlt []string) {
 }
 
 func taskAddPath(taskRlt []string, index int, coverPath string) {
-	taskRlt[index] = path.Join(*STATIC_COVER_HUB, coverPath)
+	taskRlt[index] = "http://" + path.Join(*STATIC_COVER_HUB, coverPath)
 }
 
 func dealReturn(conn net.Conn, taskRlt string) {
